@@ -1,8 +1,9 @@
-# Spending spring days crafting packets at \#NahamCon2022  (1 of 3)
-*A CTF writeup of Networking challenges at NahamCon2022 *
-*2022-05-01*
+# Spending spring days crafting packets at NahamCon 2022  (1 of 3)
 
-![[assets/6ekjqz.jpg]]
+*A CTF writeup of Networking challenges at NahamCon2022
+by [f0rked](https://github.com/yetanotherf0rked) - 2022-05-01*
+
+![why not both?](assets/6ekjqz.jpg)
 
 NahamCon2022 is over and we're glad we managed to finish in top 5% with our team (3049 points, 195 on 4034 teams). This year, they came up with three exciting Networking challenges made by **@Kkevsterrr#7469**. Although we didn't manage to solve these, it was a nice introduction to network analysis and packets crafting using **scapy**. 
 
@@ -21,27 +22,32 @@ Here's what I learned.
 > **Author: @Kkevsterrr#7469** 
   >We want to give you the flag, we really do. just give us a TCP HTTP server to send it to, and we'll make a POST request with all the deets you need! we've just got a firewall issue on our side and we're dropping certain important packets (specifically, any inbound SYN+ACK packet is dropped). Shouldn't be a problem for a networking pro like you, though - just make a TCP server that doesn't need to send those!
 
+### Traditional 3-way handshake
 In a traditional TCP 3-way handshake:
 1. the client sends a **SYN** (Synchronize Sequence Number) to inform the server he wants to start a communication. The SYN signifies with what sequence number it will start the segments with.
 2. the server responds to the client with **SYN-ACK**. The ACK signifies the response of client's SYN. Meanwhile the SYN signifies with what sequence number it will start the segments with.
 3. Finally, the client acknowledges (**ACK**) the response of the server and the connection enters the ESTABLISHED state so they can start exchanging data.
 
-![[assets/Contemperaneous Open - TCP 3-Way Handshake.png]]
 
+![TCP 3-Way Handshake](assets/3wayhandshake.png)
+
+### SYN-ACK get dropped by a distrustful firewall
 In this challenge the flag is given by a POST request to a server we're supposed to create at port 80. The thing is: the client's firewall drops every inbound SYN+ACK packet. So we must find a solution to establish a connection without sending a SYN-ACK packet.
 
-![[assets/Contemperaneous Open - SYNACK Drop.jpg]]
+![SYN-ACKs get dropped by client's firewall](assets/synackdrop.jpg)
 
 While I was spending hours refreshing my memory about TCP/IP internals, learning the basics of scapy and exploring many ways to solve the problem (fragmenting the SYN/ACK response, attempting an [HTTP3 over QUIC conection](https://www.auvik.com/franklyit/blog/what-is-quic-protocol/)), the solution was laying in the challenge's name.
 
-*Contemporaneous Open* is a reference to TCP's Simultaneous Open state transition. Also called "simultaneous active open on both side", it refers to an old TCP feature used to handle edge cases in TCP handshakes, as when a server and a client send a SYN to each other at the same time. This process makes it possible for two applications to send a SYN to each other to start a TCP connection.
+### TCP Simultaneous Open
+*Contemporaneous Open* is a reference to **TCP's Simultaneous Open** state transition. Also called "simultaneous active open on both side", it refers to an old TCP feature used to handle edge cases in TCP handshakes, as when a server and a client send a SYN to each other at the same time. This process makes it possible for two applications to send a SYN to each other to start a TCP connection.
 
-![[assets/Contemperaneous Open - TCP Simultaneous Open.jpg]]
+![TCP Simultaneous Open](assets/simultaneousopen.jpg)
 
 When both ends send a SYN at the same time, both ends enter the SYN_SENT state. When they receive the SYN, their state changes to SYN_RCVD and they resend the SYN and aknowledge the received SYN. When they both receive the SYN and the acknowledged SYN, the connection enters the ESTABLISHED state. In such a state, both ends act as a client and server.
 
-So the client doesn't need a SYN/ACK answer from the server in order to complete the three-way handshake. **All we need is to send a SYN and wait for the *client*'s SYN/ACK to establish the connection and start HTTP exchange.** This would avoid us to send a SYN/ACK packet that would be dropped by the client. We'll use Scapy to craft a server that has this behavior.
+So the client doesn't need a SYN/ACK answer from the server in order to complete the three-way handshake. **All we need is to send a SYN and wait for the *client*'s SYN/ACK to establish the connection and start HTTP exchange.** This would avoid us to send a SYN/ACK packet that would be dropped by the client. We'll use Scapy to mimic a server that has this behavior.
 
+### Crafting with scapy
 Before executing any Scapy scripts, we must disable the Linux Kernel's response to avoid any RST-flagged answers. Scapy operates in user space so the Kernel has no idea of what Scapy is doing.
 
 Using iptables, we can drop RST-flagged packets the kernel sends from port 80.
@@ -50,8 +56,8 @@ Using iptables, we can drop RST-flagged packets the kernel sends from port 80.
 sudo iptables -A OUTPUT -p tcp --tcp-flags RST RST --sport 80 -j DROP
 ```
 
-The idea is to create a customized server using scrapy that does the following:
-- receive a SYN (seq=n)
+The idea is to create a customized server that does the following:
+- receive client's SYN (seq=n)
 - send a SYN (seq=m)
 - send a ACK (seq=m+1, ack=n+1) to acknowledge client's SYN
 - client acknowledges our SYN, receives our ACK and establish session
@@ -70,7 +76,6 @@ S_ADDR = "MY_IP"
 S_PORT = 80
 
 # 1. Listen for client's SYN and get IP and port
-print("====================")
 c_syn = sniff(
     filter="tcp and port 80",
     count=1,
@@ -90,7 +95,6 @@ hmm nope looks like you didn't get it...
 
 ```
 # server.py output
-====================
 Received SYN from CLIENT_IP:http, seq=510141201
 ```
 
@@ -193,12 +197,13 @@ Node 1: MY_IP:80
 ===================================================================
 ```
 
-And we've got the flag: **flag{6acfdfc9369eadfdb9439b0ac3969711}**!
+And we get this lovely flag: **flag{6acfdfc9369eadfdb9439b0ac3969711}**
 
-A much elegant solution would be to act like a real HTTP server by sending ACKs for each client's packets and then gracefully end the connection when the client sends a FIN.
+### Improvements
+A much elegant solution would be to act like a real HTTP server by sending ACKs for each client's packet and then gracefully end the connection when the client sends a FIN.
 
 Check out **[nneonneo](https://gist.github.com/nneonneo/1b371ac9da8703eda9c3a9b26d61a483)**'s solution that implements this feature in addition to using an asynchronous sniffer that pushes incoming packets to a queue, making client's packets easier to iterate on. Clean and smooth.
 
-I would like to thank **nneonneo** and **Kkevsterrr** for their explanations.
+I would like to thank **nneonneo** and **Kkevsterrr** for their explanations. Join [Nahamsec on Discord](https://discord.gg/ysndAm8) to reach them out!
 
 For the next part, we'll see the **Freaky Flag Day** challenge.

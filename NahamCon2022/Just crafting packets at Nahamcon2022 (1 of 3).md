@@ -1,11 +1,12 @@
 # Spending spring days crafting packets at NahamCon 2022  (1 of 3)
 
 *A CTF writeup of Networking challenges at NahamCon2022
+Part 1 of 3: Contemporaneous Open
 by [f0rked](https://github.com/yetanotherf0rked) - 2022-05-01*
 
 ![why not both?](assets/6ekjqz.jpg)
 
-NahamCon2022 is over and we're glad we managed to finish in top 5% with our team (3049 points, 195 on 4034 teams). This year, they came up with three exciting Networking challenges made by **@Kkevsterrr#7469**. Although we didn't manage to solve these, it was a nice introduction to network analysis and packets crafting using **scapy**. 
+NahamCon2022 is over and we're glad we managed to finish in top 5% with our team (3049 points, 195 on 4034 teams). This year, they came up with three exciting Networking challenges made by **@Kkevsterrr#7469**. Although we didn't manage to solve these, it was a nice introduction to network analysis and packets manipulation using **Scapy**. 
 
 Here's what I learned.
 
@@ -14,25 +15,24 @@ Here's what I learned.
 - [tshark](https://tshark.dev/) wireshark's cli version
 
 **Challenges:**
-- **Contemporaneous Open** - hard - 14 solves
-- **Freaky Flag Day** - hard - 9 solves
-- **The smuggler** - hard - 8 solves
+- **Contemporaneous Open** - hard - 14 solves - 500 points - first blooded by **StaticFlow**
+- **Freaky Flag Day** - hard - 9 solves - 500 points - first blooded by **Maple Bacon**
+- **The smuggler** - hard - 8 solves - 500 points - first blooded by **ekofisk**
 
 ## Contemporaneous Open
 > **Author: @Kkevsterrr#7469** 
   >We want to give you the flag, we really do. just give us a TCP HTTP server to send it to, and we'll make a POST request with all the deets you need! we've just got a firewall issue on our side and we're dropping certain important packets (specifically, any inbound SYN+ACK packet is dropped). Shouldn't be a problem for a networking pro like you, though - just make a TCP server that doesn't need to send those!
 
 ### Traditional 3-way handshake
-In a traditional TCP 3-way handshake:
+Let's start with some useful reminders about TCP Protocol. In a traditional TCP 3-way handshake:
 1. the client sends a **SYN** (Synchronize Sequence Number) to inform the server he wants to start a communication. The SYN signifies with what sequence number it will start the segments with.
 2. the server responds to the client with **SYN-ACK**. The ACK signifies the response of client's SYN. Meanwhile the SYN signifies with what sequence number it will start the segments with.
 3. Finally, the client acknowledges (**ACK**) the response of the server and the connection enters the ESTABLISHED state so they can start exchanging data.
 
-
 ![TCP 3-Way Handshake](assets/3wayhandshake.png)
 
 ### SYN-ACK get dropped by a distrustful firewall
-In this challenge the flag is given by a POST request to a server we're supposed to create at port 80. The thing is: the client's firewall drops every inbound SYN+ACK packet. So we must find a solution to establish a connection without sending a SYN-ACK packet.
+In this challenge the flag is given by a POST request to a server we're supposed to create at port 80. The thing is: the client's firewall drops every inbound SYN-ACK packet. So we must find a solution to establish a connection without having to send a SYN-ACK-flagged packet.
 
 ![SYN-ACKs get dropped by client's firewall](assets/synackdrop.jpg)
 
@@ -45,7 +45,7 @@ While I was spending hours refreshing my memory about TCP/IP internals, learning
 
 When both ends send a SYN at the same time, both ends enter the SYN_SENT state. When they receive the SYN, their state changes to SYN_RCVD and they resend the SYN and aknowledge the received SYN. When they both receive the SYN and the acknowledged SYN, the connection enters the ESTABLISHED state. In such a state, both ends act as a client and server.
 
-So the client doesn't need a SYN/ACK answer from the server in order to complete the three-way handshake. **All we need is to send a SYN and wait for the *client*'s SYN/ACK to establish the connection and start HTTP exchange.** This would avoid us to send a SYN/ACK packet that would be dropped by the client. We'll use Scapy to mimic a server that has this behavior.
+So the client doesn't need a SYN/ACK answer from the server in order to complete the three-way handshake. **All we need is to send a SYN and wait for the *client*'s SYN/ACK to establish the connection and start HTTP exchange.** This can save us from sending a SYN/ACK packet that would be dropped by the client. We'll use Scapy to mimic a server with such a behavior.
 
 ### Crafting with scapy
 Before executing any Scapy scripts, we must disable the Linux Kernel's response to avoid any RST-flagged answers. Scapy operates in user space so the Kernel has no idea of what Scapy is doing.
@@ -197,13 +197,23 @@ Node 1: MY_IP:80
 ===================================================================
 ```
 
-And we get this lovely flag: **flag{6acfdfc9369eadfdb9439b0ac3969711}**
+And so we get this lovely flag:
+`flag{6acfdfc9369eadfdb9439b0ac3969711}`
+
+![Yaaay!](https://media1.giphy.com/media/uJFSCnoNb98RbxoJ4p/giphy.gif?cid=ecf05e47qk5wp8yr2uunau4hfbzf1s1ewj56qd61u18ndfyb&rid=giphy.gif&ct=g)
 
 ### Improvements
-A much elegant solution would be to act like a real HTTP server by sending ACKs for each client's packet and then gracefully end the connection when the client sends a FIN.
+A much more elegant solution would be to act like a real HTTP server by acquitting each client's packet, answering the POST request and then gracefully ending the connection when the client sends a FIN.
 
-Check out **[nneonneo](https://gist.github.com/nneonneo/1b371ac9da8703eda9c3a9b26d61a483)**'s solution that implements this feature in addition to using an asynchronous sniffer that pushes incoming packets to a queue, making client's packets easier to iterate on. Clean and smooth.
+Check out **[nneonneo](https://gist.github.com/nneonneo/1b371ac9da8703eda9c3a9b26d61a483)**'s solution that implements this feature in addition to using an asynchronous sniffer that pushes incoming packets to a queue, making client's packets easier to iterate on. Also he uses many helper functions to track, filter and incoming and outcoming packets. I would definitely use these as a template for next challenges. Clean and smooth.
 
 I would like to thank **nneonneo** and **Kkevsterrr** for their explanations. Join [Nahamsec on Discord](https://discord.gg/ysndAm8) to reach them out!
 
-For the next part, we'll see the **Freaky Flag Day** challenge.
+Next, we'll cover the **Freaky Flag Day** challenge.
+
+### Further Lectures
+More about this topic here:
+- [TCP State Transitions - T/TCP (Transaction TCP) for Linux](http://ttcplinux.sourceforge.net/documents/one/tcpstate/tcpstate.html#:~:text=Simultaneous%20Open,active%20open%20on%20both%20sides%22.)
+- [TCP/IP State Transition Diagram (RFC793)](https://users.cs.northwestern.edu/~agupta/cs340/project2/TCPIP_State_Transition_Diagram.pdf)
+- [RFC-793 on ietf.org](https://datatracker.ietf.org/doc/html/rfc793)
+- [The TCP/IP Guide](http://www.tcpipguide.com/index.htm)

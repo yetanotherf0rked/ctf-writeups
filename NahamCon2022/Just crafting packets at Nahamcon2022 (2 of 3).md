@@ -5,6 +5,8 @@
 Part 2 of 3: Freaky Flag Day
 by [f0rked](https://github.com/yetanotherf0rked) - 2022-05-01*
 
+![Is this a FIN?](assets/6eq8c3.jpg)
+
 This is the second writeup of my NahamCon 2022's networking challenges serie. This one will cover **Freaky Flag Day**. I hope you enjoy poetry and TCP flags.
 
 **Tools used:** 

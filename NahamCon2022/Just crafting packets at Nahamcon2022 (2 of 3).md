@@ -397,7 +397,7 @@ flag{e2960da061a85fbcabb0670e4ddb9e93}
    
 And voilà! Here's the second flag: `flag{e2960da061a85fbcabb0670e4ddb9e93}`
 
-Next we'll see the third and ultimate challenge which will include.. * \*drumrolls\* *.. DNS requests! 
+Next we'll see the third and ultimate challenge which will include.. *drumrolls*.. DNS requests! 
 
 ![So excited](https://media4.giphy.com/media/hZj44bR9FVI3K/giphy.gif?cid=ecf05e475ya42887fzmkl422tj0v3j14i1c9naraydj2izhr&rid=giphy.gif)
 

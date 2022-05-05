@@ -37,8 +37,11 @@ Want to acknowledge that a packet is successfully received? The server understan
 The goal is to reach the server correctly. Thus we must speak his language. The flags mapping is the following:
 
 S ⇔ F
+
 RA ⇔ SA
+
 A ⇔ E
+
 PA ⇔ FS
 
 ### Preliminary tests

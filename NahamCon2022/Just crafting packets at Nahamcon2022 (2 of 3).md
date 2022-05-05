@@ -1,8 +1,8 @@
 # Spending spring days crafting packets at NahamCon 2022  (2 of 3)
 
 # /!\\ this write up is still in draft state
-*A CTF writeup of Networking challenges at NahamCon2022
-Part 2 of 3: Freaky Flag Day
+*A CTF writeup of Networking challenges at NahamCon2022<br/>
+Part 2 of 3: Freaky Flag Day<br/>
 by [f0rked](https://github.com/yetanotherf0rked) - 2022-05-01*
 
 ![Is this a FIN?](assets/6eq8c3.jpg)
@@ -12,37 +12,39 @@ This is the second writeup of my NahamCon 2022's networking challenges serie. Th
 **Tools used:** 
 - [scapy](https://github.com/secdev/scapy) for packet manipulation
 - [tshark](https://tshark.dev/) wireshark's cli version
-- curl
-- nfqueue
+- [curl](https://curl.se/) for the http client
+- [nfqueue](https://github.com/oremanj/python-netfilterqueue) to intercept packets queued by the kernel packet filter
 
 **Challenges:**
-- **Contemporaneous Open** - hard - 14 solves - 500 points - first blooded by **StaticFlow**
-- **Freaky Flag Day** - hard - 9 solves - 500 points - first blooded by **Maple Bacon**
-- **The smuggler** - hard - 8 solves - 500 points - first blooded by **ekofisk**
+- **1. Contemporaneous Open** - hard - 14 solves - 500 points - first blooded by **StaticFlow**
+- **\>\>** **2. Freaky Flag Day** - hard - 9 solves - 500 points - first blooded by **Maple Bacon**
+- **3. The smuggler** - hard - 8 solves - 500 points - first blooded by **ekofisk**
 
 ## Freaky Flag Days
 > **Author: @Kkevsterrr#7469**  
-Our TCP flags have decided that they'd like to change places today; all you need to do is reach the HTTP server!  
-...
+Our TCP flags have decided that they'd like to change places today; all you need to do is reach the HTTP server!  <br/>
 Roses are red, and SYNs are FINs too.  
 RST+ACKs are now SYN+ACKs for you.  
 ACKs are now Es, and what else have we done?  
-PSH+ACKs are FIN+SYNs just for the fun.  
-...
-Hint: If you want to run this challenge from your home or a VM, make sure you are not behind a NAT that could eat your unexpected packets.
-...
+PSH+ACKs are FIN+SYNs just for the fun.  <br/>
+Hint: If you want to run this challenge from your home or a VM, make sure you are not behind a NAT that could eat your unexpected packets.<br/>
 Interact with this challenge at: http://SERVER_IP
 
-### TCP Flags
-### Flag Mapping
-| Masked flag | True flag |
-|-------------|-----------|
-| S           | F         |
-| RA          | SA        |
-| A           | E         |
-| PA          | FS        |
+So after defeating a suspicious client that drops every incoming SYN/ACK packet, our next challenger a server that swaps the flags of every request (both inbound and outbound).
 
-### Plain test
+Want to establish a session? The server understands that you want to finish it.
+Want to acknowledge that a packet is successfully received? The server understands that you're under a network congestion. Nonsense.
+
+The goal is to reach the server correctly. Thus we must speak his language. The flags mapping is the following:
+
+**S ↔ F
+RA ↔ SA
+A ↔ E
+PA ↔ FS**
+
+### Preliminary tests
+Let's try to connect to the server using **curl**.
+
 ```bash
 ❯ curl --local-port 44444 http://SERVER_IP
 ```
@@ -54,8 +56,8 @@ Interact with this challenge at: http://SERVER_IP
 ```
 As expected, nothing happens as the SYN flag is interpreted as a FYN flag on server-side.
 
-### Testing
-Let's send a FIN (SYN)
+Now let's use scapy and send a FIN-flagged with a random sequence number segment.
+
 ```python
 #! /usr/bin/python
 from scapy import *
@@ -64,11 +66,9 @@ C_ADDR = "MY_IP"
 C_PORT = 44444
 S_ADDR = "SERVER_IP"
 S_PORT = 80
+C_SEQ = 1234 # random
 
-# Building IP Layer
 ip = IP(src=C_ADDR, dst=S_ADDR)
-# Building TCP Layer
-C_SEQ = 1234
 tcp = TCP(
     sport=C_PORT,
     dport=S_PORT,
@@ -79,16 +79,159 @@ p = send(ip/tcp)
 ```
 
 ```bash
-❯ sudo tshark -f "tcp port 80 and host SERVER_IP" -z "follow,tcp,hex,0"
+❯ sudo tshark -f "tcp port 80 and host SERVER_IP"
     1 0.000000000 MY_IP → SERVER_IP TCP 54 44444 → 80 [FIN] Seq=1 Win=8192 Len=0
     2 0.144079153 SERVER_IP → MY_IP TCP 58 80 → 44444 [RST, ACK] Seq=1 Ack=2 Win=65320 Len=0 MSS=1420
 ```
-Server responds with a RST-ACK (SYN-ACK).
+The server understands "SYN" and sends us RST-ACK (which is SYN-ACK). So now he must be waiting for a a ECN (which is an ACK)... And so on. You got it.
 
-### Packet interception, modification and forwarding with scapy and nfqueue
-We could rewrite an HTTP client with scapy using the modified flags. But a less painful solution would be to use a standard http client like **curl** to make the POST requests, intercept all the incoming and outcoming packages with **nfqueue**, pass them to our **scapy** script that will change the flags accordingly and then forward them to their destination.
+### Packet interception and modification with scapy and nfqueue
+We could rewrite an HTTP client with scapy using the modified flags. But it is a long and tedious task as we must craft every request with scapy. A less painful solution would be to have a layer that intercepts every packet and just update the flags before sending/accepting them. And that's where **nfqueue** can help us.
+
+Using a standard http client like **curl**, intercept all the incoming and outcoming packages with **nfqueue**, pass them to our **scapy** script that will change the flags accordingly and then send the modified packets to their destination.
+
+**Netfilter Queue is an iptables target which gives the decision on packets to the userspace**. It is part of the Netfilter project that also provides iptables and nftables. It is commonly used as a proxy or for Man in the Middle attacks.
+
+To intercept packets with nfqueue you must set firewall's chain rules accordingly. In this situation we want to intercept:
+- incoming packets from SERVER_IP (INPUT chain)
+- outgoing packets to SERVER_IP (OUTPUT chain)
+
+![Intercepting packets with nfqueue](assets/freakyflagday.jpg)
 
 Let's try this.
+
+### 1. Let's set nfqueue
+```python
+#!/usr/bin/python3
+from netfilterqueue import NetfilterQueue
+from scapy import *
+import os
+
+S_ADDR = "SERVER_IP"
+
+# Update iptables rules
+output_rule = f"iptables -A OUTPUT --destination {S_ADDR} -j NFQUEUE"
+input_rule = f"iptables -A INPUT --source {S_ADDR} -j NFQUEUE"
+flush_rules = "iptables -F OUTPUT && iptables -F INPUT"
+os.system(input_rule)
+os.system(output_rule)
+
+def callback(raw_pkt):
+    # Get a scapy object from raw packet
+    p = IP(raw_pkt.get_payload())
+    print(p.show())
+    raw_pkt.accept()
+
+# Init nfqueue
+q = NetfilterQueue()
+q.bind(0, callback)
+try:
+    q.run()
+except KeyboardInterrupt:
+    q.unbind()
+    os.system(flush_rules)
+```
+
+First we update iptables rules to intercept the interesting packets to nfqueue. Then we init nfqueue and bind the queue no. 0 to our callback function.
+In our callback function, we get a raw packet. To manipulate it, we create a scapy IP layer with the packet's payload as an argument. We print it and finally we accept the packet. If we interrupt the process (with Ctrl+C) then we unbind the queue and flush the iptables rules.
+
+**Important:** check your INPUT and OUTPUT chain rules before flushing it as it flushes everything.
+
+Let's see if it works.
+
+```bash
+❯ curl http://SERVER_IP --local-port 44444
+```
+
+```
+# Script output
+###[ IP ]### 
+  version= 4
+  ihl= 5
+  tos= 0x0
+  len= 60
+  id= 60025
+  flags= DF
+  frag= 0
+  ttl= 64
+  proto= tcp
+  chksum= 0xa981
+  src= SERVER_IP
+  dst= CLIENT_IP
+  \options\
+###[ TCP ]### 
+     sport= 44444
+     dport= http
+     seq= 1190907934
+     ack= 0
+     dataofs= 10
+     reserved= 0
+     flags= S
+     window= 64240
+     chksum= 0xfaf1
+     urgptr= 0
+     options= [('MSS', 1460), ('SAckOK', b''), ('Timestamp', (2004053730, 0)), ('NOP', None), ('WScale', 7)]
+```
+
+```bash
+❯ sudo tshark -f "tcp port 80 and host 104.197.128.84"
+    1 0.000000000 162.19.27.148 → 104.197.128.84 TCP 74 44444 → 80 [SYN] Seq=0 Win=64240 Len=0 MSS=1460 SACK_PERM=1 TSval=2004025682 TSecr=0 WS=128
+```
+
+Great! Curl tries to initiate the session with the server using a SYN-flagged packet. When the packet reaches the `raw_pkt.accept()` instruction, it is sent to the client and we can notice it in **tshark**'s output.
+
+### 2. Changing the flag
+In our callback function, let's try changing the packet's flag with 'F' and see what happens.
+```python
+def callback(raw_pkt):
+    # Get a scapy object from raw packet
+    p = IP(raw_pkt.get_payload())
+    print(p.show())                                                                  
+    # Set S flag to F flag
+    if p.haslayer(TCP):
+		if p[TCP].flags = "S"
+            p[TCP].flags = "F"
+		
+	# Update raw packet and then accept it
+	raw_pkt.set_payload(bytes(p))
+	raw_pkt.accept()
+```
+
+```bash
+❯ sudo tshark -f "tcp port 80 and host 104.197.128.84"
+    1 0.000000000 162.19.27.148 → 104.197.128.84 TCP 74 44444 → 80 [FIN] Seq=1 Win=64240 Len=0 MSS=1460 SACK_PERM=1 TSval=2005103907 TSecr=0 WS=128
+    2 1.005513362 162.19.27.148 → 104.197.128.84 TCP 74 [TCP Retransmission] 44444 → 80 [FIN] Seq=1 Win=8222720 Len=0 MSS=1460 SACK_PERM=1 TSval=2005104912 TSecr=0 WS=128
+```
+
+Something is wrong, we send a FIN but get no answer... Oh right! checksums, of course. Let's update checksums accordingly.
+
+### 3. Update checksums
+
+```python
+# Set S flag to F flag
+    if p.haslayer(TCP):
+		if p[TCP].flags = "S"
+            p[TCP].flags = "F"
+		# Update checksums
+        del p[IP].chksum     
+        del p[TCP].chksum    
+        p.show2()
+```
+
+I use the function `show2()` that recalculate checksums if they are none. This is functional but loud as it also prints the packet. I didn't find any other solution that does it quietly.
+
+Let's try now.
+
+```bash
+❯ sudo tshark -f "tcp port 80 and host 104.197.128.84"
+    1 0.000000000 162.19.27.148 → 104.197.128.84 TCP 74 44444 → 80 [FIN] Seq=1 Win=64240 Len=0 MSS=1460 SACK_PERM=1 TSval=2005448037 TSecr=0 WS=128
+    2 0.154677103 104.197.128.84 → 162.19.27.148 TCP 74 80 → 44444 [RST, ACK] Seq=1 Ack=2 Win=64768 Len=0 MSS=1420 SACK_PERM=1 TSval=1006897750 TSecr=2005448037 WS=128
+
+```
+
+Yes! The server answers us back with a RST-ACK. But our curl client still doesn't understand what he means by that. Let's map all the flags accordingly now.
+
+### 4. Map all the flags (final code)
 
 ```python
 #!/usr/bin/python3
@@ -129,7 +272,6 @@ def callback(raw_pkt):
 		# Calculate new chksums
 		del p[IP].chksum
 		del p[TCP].chksum
-		# since there's no function to update checksums easily apart from this one (to my knowledge), I'm going to use it
 		p.show2()
 		# Update 
 		raw_pkt.set_payload(bytes(p))
@@ -146,6 +288,10 @@ except KeyboardInterrupt:
     q.unbind()
     os.system(flush_rules)
 ```
+
+We use a dictionary to map all the flags. And then we use the `Dict.update()` method to add the same tuples but with the keys and values swaped. (e.g. `"S":"F"` adds `"F":"S"`).
+
+Let's try our new code now.
 
 ```bash
 ❯ curl http://SERVER_IP --local-port 44444
@@ -177,7 +323,9 @@ except KeyboardInterrupt:
    11 0.562439239 SERVER_IP → MY_IP TCP 66 [TCP Retransmission] 80 → 44444 [FIN, ACK] Seq=310 Ack=1 Win=506 Len=0 TSval=786145885 TSecr=1784676669
    12 0.583268378 MY_IP → SERVER_IP TCP 66 44444 → 80 [ECN] Seq=79 Win=501 Len=0 TSval=1784676807 TSecr=786145885
 ```
-Seems like it worked pretty well. Let's try and get the file.
+
+Seems like it worked pretty well. The flag seems to be in this `gimmedafile.txt` file. Let's try and get the file.
+
 ```bash
 ❯ curl http://SERVER_IP/gimmedafile.txt --local-port 44445
 Voluptatem ipsum [...39404 characters...] dolor ut.
@@ -243,16 +391,16 @@ flag{e2960da061a85fbcabb0670e4ddb9e93}
    54 0.793113070 MY_IP → SERVER_IP TCP 66 44445 → 80 [ECN] Seq=94 Win=501 Len=0 TSval=1784825466 TSecr=786294541
 ```
    
-And here's the second flag: `flag{e2960da061a85fbcabb0670e4ddb9e93}`
+And voilà! Here's the second flag: `flag{e2960da061a85fbcabb0670e4ddb9e93}`
 
-Next we'll see the third and ultimate challenge which will include.. *drumrolls* DNS requests! Yay! So excited.
+Next we'll see the third and ultimate challenge which will include.. * \*drumrolls\* *.. DNS requests! 
 
-c:
+![So excited](https://media4.giphy.com/media/hZj44bR9FVI3K/giphy.gif?cid=ecf05e475ya42887fzmkl422tj0v3j14i1c9naraydj2izhr&rid=giphy.gif)
 
 ### Resources
-[Using nfqueue with python](https://byt3bl33d3r.github.io/using-nfqueue-with-python-the-right-way.html)
-[Scapy docs](https://scapy.readthedocs.io/)
-[About calculating checksums with Scapy on Stack Overflow](https://stackoverflow.com/questions/5953371/how-to-calculate-a-packet-checksum-without-sending-it)
-[python-netfilterqueue on Github](https://github.com/oremanj/python-netfilterqueue)
-[Netfilter project](https://www.netfilter.org/)
-[TCP Flags on KeyCDN](https://www.keycdn.com/support/tcp-flags)
+- [Using nfqueue with python](https://byt3bl33d3r.github.io/using-nfqueue-with-python-the-right-way.html)
+- [Scapy docs](https://scapy.readthedocs.io/)
+- [About calculating checksums with Scapy on Stack Overflow](https://stackoverflow.com/questions/5953371/how-to-calculate-a-packet-checksum-without-sending-it)
+- [python-netfilterqueue on Github](https://github.com/oremanj/python-netfilterqueue)
+- [Netfilter project](https://www.netfilter.org/)
+- [TCP Flags on KeyCDN](https://www.keycdn.com/support/tcp-flags)

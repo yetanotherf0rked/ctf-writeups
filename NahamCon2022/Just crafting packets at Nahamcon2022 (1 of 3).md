@@ -15,9 +15,9 @@ Here's what I learned.
 - [tshark](https://tshark.dev/) wireshark's cli version
 
 **Challenges:**
-- **Contemporaneous Open** - hard - 14 solves - 500 points - first blooded by **StaticFlow**
-- **Freaky Flag Day** - hard - 9 solves - 500 points - first blooded by **Maple Bacon**
-- **The smuggler** - hard - 8 solves - 500 points - first blooded by **ekofisk**
+- **>> 1. Contemporaneous Open** - hard - 14 solves - 500 points - first blooded by **StaticFlow**
+- **2. Freaky Flag Day** - hard - 9 solves - 500 points - first blooded by **Maple Bacon**
+- **3. The smuggler** - hard - 8 solves - 500 points - first blooded by **ekofisk**
 
 ## Contemporaneous Open
 > **Author: @Kkevsterrr#7469** 
@@ -177,8 +177,8 @@ Filter: tcp.stream eq 0
 Node 0: CLIENT_IP:34206
 Node 1: MY_IP:80
 00000000  50 4f 53 54 20 2f 20 48  54 54 50 2f 31 2e 31 0d  POST / H TTP/1.1.
-00000010  0a 48 6f 73 74 3a 20 31  36 32 2e 31 39 2e 32 37  .Host: 1 62.19.27
-00000020  2e 31 34 38 0d 0a 55 73  65 72 2d 41 67 65 6e 74  .148..Us er-Agent
+00000010  0a 48 6f 73 74 3a 20 ■   ■  ■  ■  ■  ■  ■  ■  ■   .Host: ■ ■■■■■■■■
+00000020  ■  ■  ■  ■  0d 0a 55 73  65 72 2d 41 67 65 6e 74  ■■■■..Us er-Agent
 00000030  3a 20 70 79 74 68 6f 6e  2d 72 65 71 75 65 73 74  : python -request
 00000040  73 2f 32 2e 32 37 2e 31  0d 0a 41 63 63 65 70 74  s/2.27.1 ..Accept
 00000050  2d 45 6e 63 6f 64 69 6e  67 3a 20 67 7a 69 70 2c  -Encodin g: gzip,

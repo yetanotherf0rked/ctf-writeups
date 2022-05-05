@@ -1,9 +1,8 @@
 # Spending spring days crafting packets at NahamCon 2022  (2 of 3)
 
-# /!\\ this write up is still in draft state
 *A CTF writeup of Networking challenges at NahamCon2022<br/>
 Part 2 of 3: Freaky Flag Day<br/>
-by [f0rked](https://github.com/yetanotherf0rked) - 2022-05-01*
+by [f0rked](https://github.com/yetanotherf0rked) - 2022-05-05*
 
 ![Is this a FIN?](assets/6eq8c3.jpg)
 
@@ -37,10 +36,13 @@ Want to acknowledge that a packet is successfully received? The server understan
 
 The goal is to reach the server correctly. Thus we must speak his language. The flags mapping is the following:
 
-**S ↔ F
-RA ↔ SA
-A ↔ E
-PA ↔ FS**
+
+| |
+|-------------|-----------|
+| S           | F         |
+| RA          | SA        |
+| A           | E         |
+| PA          | FS        |
 
 ### Preliminary tests
 Let's try to connect to the server using **curl**.
@@ -120,6 +122,7 @@ def callback(raw_pkt):
     # Get a scapy object from raw packet
     p = IP(raw_pkt.get_payload())
     print(p.show())
+	# Tell nfqueue to accept the packet
     raw_pkt.accept()
 
 # Init nfqueue
@@ -132,7 +135,8 @@ except KeyboardInterrupt:
     os.system(flush_rules)
 ```
 
-First we update iptables rules to intercept the interesting packets to nfqueue. Then we init nfqueue and bind the queue no. 0 to our callback function.
+First we update iptables rules to intercept the interesting packets to nfqueue. Then we init nfqueue and bind the queue number 0 to our callback function. We use the same queue for both incoming and outgoing packets.
+
 In our callback function, we get a raw packet. To manipulate it, we create a scapy IP layer with the packet's payload as an argument. We print it and finally we accept the packet. If we interrupt the process (with Ctrl+C) then we unbind the queue and flush the iptables rules.
 
 **Important:** check your INPUT and OUTPUT chain rules before flushing it as it flushes everything.
@@ -174,8 +178,8 @@ Let's see if it works.
 ```
 
 ```bash
-❯ sudo tshark -f "tcp port 80 and host 104.197.128.84"
-    1 0.000000000 162.19.27.148 → 104.197.128.84 TCP 74 44444 → 80 [SYN] Seq=0 Win=64240 Len=0 MSS=1460 SACK_PERM=1 TSval=2004025682 TSecr=0 WS=128
+❯ sudo tshark -f "tcp port 80 and host SERVER_IP"
+    1 0.000000000 CLIENT_IP → SERVER_IP TCP 74 44444 → 80 [SYN] Seq=0 Win=64240 Len=0 MSS=1460 SACK_PERM=1 TSval=2004025682 TSecr=0 WS=128
 ```
 
 Great! Curl tries to initiate the session with the server using a SYN-flagged packet. When the packet reaches the `raw_pkt.accept()` instruction, it is sent to the client and we can notice it in **tshark**'s output.
@@ -198,9 +202,9 @@ def callback(raw_pkt):
 ```
 
 ```bash
-❯ sudo tshark -f "tcp port 80 and host 104.197.128.84"
-    1 0.000000000 162.19.27.148 → 104.197.128.84 TCP 74 44444 → 80 [FIN] Seq=1 Win=64240 Len=0 MSS=1460 SACK_PERM=1 TSval=2005103907 TSecr=0 WS=128
-    2 1.005513362 162.19.27.148 → 104.197.128.84 TCP 74 [TCP Retransmission] 44444 → 80 [FIN] Seq=1 Win=8222720 Len=0 MSS=1460 SACK_PERM=1 TSval=2005104912 TSecr=0 WS=128
+❯ sudo tshark -f "tcp port 80 and host SERVER_IP"
+    1 0.000000000 CLIENT_IP → SERVER_IP TCP 74 44444 → 80 [FIN] Seq=1 Win=64240 Len=0 MSS=1460 SACK_PERM=1 TSval=2005103907 TSecr=0 WS=128
+    2 1.005513362 CLIENT_IP → SERVER_IP TCP 74 [TCP Retransmission] 44444 → 80 [FIN] Seq=1 Win=8222720 Len=0 MSS=1460 SACK_PERM=1 TSval=2005104912 TSecr=0 WS=128
 ```
 
 Something is wrong, we send a FIN but get no answer... Oh right! checksums, of course. Let's update checksums accordingly.
@@ -223,9 +227,9 @@ I use the function `show2()` that recalculate checksums if they are none. This i
 Let's try now.
 
 ```bash
-❯ sudo tshark -f "tcp port 80 and host 104.197.128.84"
-    1 0.000000000 162.19.27.148 → 104.197.128.84 TCP 74 44444 → 80 [FIN] Seq=1 Win=64240 Len=0 MSS=1460 SACK_PERM=1 TSval=2005448037 TSecr=0 WS=128
-    2 0.154677103 104.197.128.84 → 162.19.27.148 TCP 74 80 → 44444 [RST, ACK] Seq=1 Ack=2 Win=64768 Len=0 MSS=1420 SACK_PERM=1 TSval=1006897750 TSecr=2005448037 WS=128
+❯ sudo tshark -f "tcp port 80 and host SERVER_IP"
+    1 0.000000000 CLIENT_IP → SERVER_IP TCP 74 44444 → 80 [FIN] Seq=1 Win=64240 Len=0 MSS=1460 SACK_PERM=1 TSval=2005448037 TSecr=0 WS=128
+    2 0.154677103 SERVER_IP → CLIENT_IP TCP 74 80 → 44444 [RST, ACK] Seq=1 Ack=2 Win=64768 Len=0 MSS=1420 SACK_PERM=1 TSval=1006897750 TSecr=2005448037 WS=128
 
 ```
 
@@ -397,7 +401,7 @@ Next we'll see the third and ultimate challenge which will include.. * \*drumrol
 
 ![So excited](https://media4.giphy.com/media/hZj44bR9FVI3K/giphy.gif?cid=ecf05e475ya42887fzmkl422tj0v3j14i1c9naraydj2izhr&rid=giphy.gif)
 
-### Resources
+### Further Lectures
 - [Using nfqueue with python](https://byt3bl33d3r.github.io/using-nfqueue-with-python-the-right-way.html)
 - [Scapy docs](https://scapy.readthedocs.io/)
 - [About calculating checksums with Scapy on Stack Overflow](https://stackoverflow.com/questions/5953371/how-to-calculate-a-packet-checksum-without-sending-it)

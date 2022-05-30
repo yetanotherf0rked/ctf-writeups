@@ -1,12 +1,12 @@
-# Spending spring days crafting packets at NahamCon 2022  (1 of 3)
+# Spending spring days crafting packets at NahamCon 2022  (1 of 2)
 
 *A CTF writeup of Networking challenges at NahamCon2022
-Part 1 of 3: Contemporaneous Open
+Part 1 of 2: Contemporaneous Open
 by [f0rked](https://github.com/yetanotherf0rked) - 2022-05-01*
 
 ![why not both?](assets/6ekjqz.jpg)
 
-NahamCon2022 is over and we're glad we managed to finish in top 5% with our team (3049 points, 195 on 4034 teams). This year, they came up with three exciting Networking challenges made by **@Kkevsterrr#7469**. Although we didn't manage to solve these, it was a nice introduction to network analysis and packets manipulation using **Scapy**. 
+NahamCon2022 is over and we're glad we managed to finish in top 5% with our team (3049 points, 195 on 4034 teams). This year, they came up with exciting Networking challenges made by **@Kkevsterrr#7469**. Although we didn't manage to solve these, it was a nice introduction to network analysis and packets manipulation using **Scapy**. 
 
 Here's what I learned.
 
@@ -15,9 +15,8 @@ Here's what I learned.
 - [tshark](https://tshark.dev/) wireshark's cli version
 
 **Challenges:**
-- **>> 1. Contemporaneous Open** - hard - 14 solves - 500 points - first blooded by **StaticFlow**
+- **1. Contemporaneous Open** - hard - 14 solves - 500 points - first blooded by **StaticFlow**
 - **2. Freaky Flag Day** - hard - 9 solves - 500 points - first blooded by **Maple Bacon**
-- **3. The smuggler** - hard - 8 solves - 500 points - first blooded by **ekofisk**
 
 ## Contemporaneous Open
 > **Author: @Kkevsterrr#7469** 

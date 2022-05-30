@@ -1,7 +1,7 @@
-# Spending spring days crafting packets at NahamCon 2022  (2 of 3)
+# Spending spring days crafting packets at NahamCon 2022  (2 of 2)
 
 *A CTF writeup of Networking challenges at NahamCon2022<br/>
-Part 2 of 3: Freaky Flag Day<br/>
+Part 2 of 2: Freaky Flag Day<br/>
 by [f0rked](https://github.com/yetanotherf0rked) - 2022-05-05*
 
 ![Is this a FIN?](assets/6eq8c3.jpg)
@@ -16,8 +16,7 @@ This is the second writeup of my NahamCon 2022's networking challenges serie. Th
 
 **Challenges:**
 - **1. Contemporaneous Open** - hard - 14 solves - 500 points - first blooded by **StaticFlow**
-- **\>\>** **2. Freaky Flag Day** - hard - 9 solves - 500 points - first blooded by **Maple Bacon**
-- **3. The smuggler** - hard - 8 solves - 500 points - first blooded by **ekofisk**
+- **2. Freaky Flag Day** - hard - 9 solves - 500 points - first blooded by **Maple Bacon**
 
 ## Freaky Flag Days
 > **Author: @Kkevsterrr#7469**  
@@ -396,10 +395,9 @@ flag{e2960da061a85fbcabb0670e4ddb9e93}
 ```
    
 And voilà! Here's the second flag: `flag{e2960da061a85fbcabb0670e4ddb9e93}`
-
-Next we'll see the third and ultimate challenge which will include.. *drumrolls*.. DNS requests! 
-
 ![So excited](https://media4.giphy.com/media/hZj44bR9FVI3K/giphy.gif?cid=ecf05e475ya42887fzmkl422tj0v3j14i1c9naraydj2izhr&rid=giphy.gif)
+
+I hope you enjoyed this introduction to packets manipulation. Let me know if you have any suggestions. :)
 
 ### Further Lectures
 - [Using nfqueue with python](https://byt3bl33d3r.github.io/using-nfqueue-with-python-the-right-way.html)
